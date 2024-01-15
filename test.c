@@ -17,8 +17,11 @@ int main() {
         ht = hashtable_create(ctor,dtor);
     while(fgets(buffer,sizeof(buffer),tests)) {
         buffer[strcspn(buffer, "\r\n")] = 0;
-        hashtable_insert(ht,buffer,strlen(buffer));
-        printf("found : %s\n",(char*)hashtable_search(ht,buffer,strlen(buffer)));
+        find = hashtable_insert(ht,buffer,strlen(buffer));
+        if(find)
+            printf("==== collision detected ====\n");   
+        else
+            printf("found : %s\n",(char*)hashtable_search(ht,buffer,strlen(buffer)));
     }
     /* now delete and search*/
     rewind(tests);
@@ -30,5 +33,6 @@ int main() {
             printf("%s not found\n",buffer);
         }
     }
+    hashtable_destroy(&ht);
     return 0;
 }

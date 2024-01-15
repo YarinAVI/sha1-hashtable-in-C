@@ -25,7 +25,6 @@ Hashtable hashtable_create(void * (*ctor)(const void *copy),void (*dtor)(void *i
     ht->dtor = dtor;
     return ht;
 }
-
 void * hashtable_insert(Hashtable ht,const void * item,const size_t item_size){
     int i;
     int index;
@@ -45,6 +44,8 @@ void * hashtable_insert(Hashtable ht,const void * item,const size_t item_size){
         }
         indexer = indexer[index];
     }
+    if(*indexer)
+        return NULL;
     (*indexer) = ht->ctor(item);
     return (*indexer);
 }
@@ -88,4 +89,27 @@ void hashtable_remove(Hashtable ht,void * item,const size_t item_size) {
     }
     ht->dtor(*indexer);
     *indexer = NULL;
+}
+static void hashtable_destroy_internal(Hashtable  ht, void **indexer , int ptrindex) {
+    int i;
+    if(ptrindex == 80 ) {
+        ht->dtor(*indexer);
+    }
+    for(i=0;i<16;i++) {
+        if(indexer[i] != NULL) {
+            hashtable_destroy_internal(ht,indexer[i],ptrindex+1);
+            free(indexer[i]);
+        }
+    }
+}
+void hashtable_destroy(Hashtable * ht) {
+    int i;
+    for(i=0;i<16;i++) {
+        if((*ht)->ptrbase[i]) {
+            hashtable_destroy_internal(*ht,(*ht)->ptrbase[i],1);
+            free((*ht)->ptrbase[i]);
+        }
+    }
+    free(*ht);
+    *ht = NULL;
 }
