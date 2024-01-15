@@ -92,24 +92,24 @@ void hashtable_remove(Hashtable ht,void * item,const size_t item_size) {
 }
 static void hashtable_destroy_internal(Hashtable  ht, void **indexer , int ptrindex) {
     int i;
-    if(ptrindex == 80 ) {
+    if(ptrindex == 40 && *indexer != NULL ) {
         ht->dtor(*indexer);
     }
-    for(i=0;i<16;i++) {
-        if(indexer[i] != NULL) {
-            hashtable_destroy_internal(ht,indexer[i],ptrindex+1);
-            free(indexer[i]);
+    else if(ptrindex == 40) {
+        return;
+    }
+    else {
+        for(i=0;i<16;i++) {
+            if(indexer[i] != NULL) {
+                hashtable_destroy_internal(ht,indexer[i],ptrindex+1);
+                free(indexer[i]);
+                indexer[i] = NULL;
+            }
         }
     }
 }
 void hashtable_destroy(Hashtable * ht) {
-    int i;
-    for(i=0;i<16;i++) {
-        if((*ht)->ptrbase[i]) {
-            hashtable_destroy_internal(*ht,(*ht)->ptrbase[i],1);
-            free((*ht)->ptrbase[i]);
-        }
-    }
+    hashtable_destroy_internal(*ht,(*ht)->ptrbase,0);
     free(*ht);
     *ht = NULL;
 }
