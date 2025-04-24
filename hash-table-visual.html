@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaf Node Hashtable Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha1/0.6.0/sha1.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        input, button, select {
+            padding: 8px 12px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .graph-container {
+            width: 100%;
+            height: 700px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 12px;
+            z-index: 100;
+        }
+        .legend {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+        .stored-keys {
+            margin-top: 20px;
+        }
+        .key-item {
+            background-color: #e3f2fd;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .key-buttons button {
+            margin-left: 5px;
+        }
+        .status {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f1f8e9;
+            border-left: 4px solid #4CAF50;
+            border-radius: 4px;
+            display: none;
+        }
+        .hash-display {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            display: none;
+        }
+        .controls-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Hashtable Tree Visualization</h1>
+        
+        <div class="controls">
+            <input type="text" id="keyInput" placeholder="Enter a string key" />
+            <button id="insertBtn">Insert</button>
+            <button id="resetBtn">Reset</button>
+            <select id="maxDepth">
+                <option value="3">Depth: 3</option>
+                <option value="4">Depth: 4</option>
+                <option value="5">Depth: 5</option>
+                <option value="6">Depth: 6</option>
+                <option value="7">Depth: 7</option>
+                <option value="8" selected>Depth: 8</option>
+                <option value="10">Depth: 10</option>
+                <option value="12">Depth: 12</option>
+                <option value="15">Depth: 15</option>
+                <option value="20">Depth: 20</option>
+            </select>
+            <button id="applyDepthBtn">Apply Depth</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        <div id="hashDisplay" class="hash-display"></div>
+        
+        <div class="graph-container">
+            <div class="controls-panel">
+                <button id="zoomInBtn">+</button>
+                <button id="zoomOutBtn">-</button>
+                <button id="resetViewBtn">Reset View</button>
+            </div>
+            <svg id="graph" width="100%" height="100%"></svg>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3498db;"></div>
+                <div>Root Node</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff8c00;"></div>
+                <div>Node with Value (Leaf)</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #95a5a6;"></div>
+                <div>Empty Node (Path)</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #ff0000;"></div>
+                <div>Highlighted Path</div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; border-left: 4px solid #3498db;">
+            <h4 style="margin-top: 0;">About This Visualization</h4>
+            <p>
+                This visualization shows how your SHA1-based hashtable works:
+            </p>
+            <ul style="margin-top: 5px;">
+                <li>Each node shows two values: the hex value (0-F) on top and the position in the hash [n] below</li>
+                <li>The edges show which hash position (pos n) determines the path at that step</li>
+                <li>The complete string is stored only at the leaf node (orange)</li>
+                <li>The path to each string is determined by nibbles in the SHA1 hash</li>
+            </ul>
+        </div>
+        
+        <div class="stored-keys">
+            <h3>Stored Keys</h3>
+            <div id="keysList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Hashtable implementation
+        const hashtable = {
+            root: {},
+            storedKeys: {}
+        };
+        
+        // DOM elements
+        const keyInput = document.getElementById('keyInput');
+        const insertBtn = document.getElementById('insertBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const maxDepthSelect = document.getElementById('maxDepth');
+        const status = document.getElementById('status');
+        const hashDisplay = document.getElementById('hashDisplay');
+        const keysList = document.getElementById('keysList');
+        const svg = d3.select("#graph");
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const resetViewBtn = document.getElementById('resetViewBtn');
+        
+        // Graph dimensions
+        const width = svg.node().getBoundingClientRect().width;
+        const height = svg.node().getBoundingClientRect().height;
+        
+        // D3 elements
+        let simulation;
+        let zoom;
+        let tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+        
+        // Insert a key into the hashtable
+        function insertKey(key) {
+            const hash = sha1(key);
+            showHash(key, hash);
+            
+            let node = hashtable.root;
+            let path = [];
+            
+            // Insert based on SHA1 hash
+            for (let i = 0; i < hash.length; i++) {
+                const nibble = parseInt(hash[i], 16);
+                path.push(nibble);
+                
+                if (!node[nibble]) {
+                    node[nibble] = {};
+                }
+                
+                node = node[nibble];
+            }
+            
+            // Store the value
+            node.value = key;
+            hashtable.storedKeys[key] = {
+                hash,
+                node,
+                path
+            };
+            
+            showStatus(`Key "${key}" inserted successfully!`);
+            updateKeysList();
+            updateGraph();
+            
+            // Add a small delay before highlighting to ensure graph is updated
+            setTimeout(() => {
+                highlightPath(path, key);
+            }, 500);
+        }
+        
+        // Show hash information
+        function showHash(key, hash) {
+            hashDisplay.style.display = "block";
+            
+            let hashHtml = `<strong>SHA1 Hash for "${key}":</strong> ${hash}<br><br>`;
+            hashHtml += `<strong>Hash breakdown:</strong> `;
+            
+            // Show nibbles with position indicators
+            for (let i = 0; i < Math.min(hash.length, 15); i++) {
+                // Show each nibble with its position
+                const nibble = hash[i];
+                hashHtml += `<span style="margin-right: 4px; padding: 2px 4px; background-color: #e9ecef;">${nibble}<small style="color:#666;">(${i})</small></span>`;
+            }
+            
+            if (hash.length > 10) {
+                hashHtml += ` ... (${hash.length - 10} more)`;
+            }
+            
+            hashDisplay.innerHTML = hashHtml;
+        }
+        
+        // Show status message
+        function showStatus(message) {
+            status.style.display = "block";
+            status.textContent = message;
+        }
+        
+        // Update the list of stored keys
+        function updateKeysList() {
+            keysList.innerHTML = '';
+            
+            const keys = Object.keys(hashtable.storedKeys);
+            if (keys.length === 0) {
+                keysList.innerHTML = '<p>No keys stored yet</p>';
+                return;
+            }
+            
+            keys.forEach(key => {
+                const keyItem = document.createElement('div');
+                keyItem.className = 'key-item';
+                
+                const keyInfo = document.createElement('div');
+                keyInfo.innerHTML = `
+                    <strong>"${key}"</strong> 
+                    <span style="font-family: monospace; font-size: 12px; color: #666;">
+                        (${hashtable.storedKeys[key].hash.substring(0, 8)}...)
+                    </span>
+                `;
+                
+                const keyButtons = document.createElement('div');
+                keyButtons.className = 'key-buttons';
+                
+                const highlightBtn = document.createElement('button');
+                highlightBtn.textContent = 'Highlight';
+                highlightBtn.addEventListener('click', () => {
+                    const path = hashtable.storedKeys[key].path;
+                    showHash(key, hashtable.storedKeys[key].hash);
+                    highlightPath(path, key);
+                });
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = 'Remove';
+                removeBtn.style.backgroundColor = '#e74c3c';
+                removeBtn.addEventListener('click', () => {
+                    if (hashtable.storedKeys[key]) {
+                        hashtable.storedKeys[key].node.value = undefined;
+                        delete hashtable.storedKeys[key];
+                        updateKeysList();
+                        updateGraph();
+                        showStatus(`Key "${key}" removed from hashtable.`);
+                    }
+                });
+                
+                keyButtons.appendChild(highlightBtn);
+                keyButtons.appendChild(removeBtn);
+                
+                keyItem.appendChild(keyInfo);
+                keyItem.appendChild(keyButtons);
+                keysList.appendChild(keyItem);
+            });
+        }
+        
+        // Update the graph visualization
+        function updateGraph() {
+            // Get max depth for visualization
+            const maxDepth = parseInt(maxDepthSelect.value);
+            
+            // Convert hashtable to graph data
+            const { nodes, links } = convertToGraphData(hashtable.root, maxDepth);
+            
+            // Clear the SVG
+            svg.selectAll("*").remove();
+            
+            // Create a group for all elements
+            const g = svg.append("g");
+            
+            // Create zoom behavior
+            zoom = d3.zoom()
+                .scaleExtent([0.1, 10])
+                .on("zoom", (event) => {
+                    g.attr("transform", event.transform);
+                });
+            
+            svg.call(zoom);
+            
+            // Initialize nodes with different starting positions
+            nodes.forEach(d => {
+                const depth = d.id.split('-').length - 1;
+                d.x = width / 2 + (Math.random() - 0.5) * 100 * depth;
+                d.y = 50 + depth * 80 + (Math.random() - 0.5) * 50;
+            });
+            
+            // Create simulation
+            simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("x", d3.forceX(width / 2).strength(0.1))
+                .force("y", d3.forceY(height / 2).strength(0.1))
+                .alphaTarget(0.3)
+                .alphaDecay(0.01);
+            
+            // Draw links
+            const link = g.append("g")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("stroke", "#999")
+                .attr("stroke-width", 1)
+                .attr("stroke-opacity", 0.6)
+                .attr("id", d => `link-${d.source.id}-${d.target.id}`);
+            
+            // Add labels to all links
+            g.selectAll(".link-label")
+                .data(links)
+                .enter().append("text")
+                .attr("class", "link-label")
+                .attr("font-size", "9px")
+                .attr("text-anchor", "middle")
+                .attr("dy", -5)
+                .text(d => {
+                    const parts = d.target.id.split('-');
+                    const depth = parts.length - 1;
+                    return `pos ${depth-1}`;
+                })
+                .attr("fill", "#666");
+            
+            // Draw nodes
+            const node = g.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .enter().append("g")
+                .attr("id", d => `node-${d.id}`)
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended))
+                .on("mouseover", function(event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(getNodeTooltip(d))
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", function() {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+            
+            // Add circles to nodes
+            node.append("circle")
+                .attr("r", d => d.isRoot ? 12 : (d.hasValue ? 10 : 5))
+                .attr("fill", d => d.isRoot ? "#3498db" : (d.hasValue ? "#ff8c00" : "#95a5a6"))
+                .attr("stroke", "#fff")
+                .attr("stroke-width", 1.5);
+            
+            // Add labels to leaf nodes showing the stored value
+            node.filter(d => d.hasValue)
+                .append("text")
+                .attr("dy", 30)
+                .attr("text-anchor", "middle")
+                .text(d => `"${d.value}"`)
+                .attr("fill", "#333")
+                .attr("font-size", 12)
+                .attr("font-weight", "bold");
+            
+            // Add node ids as small labels
+            node.append("text")
+                .attr("dy", -10)
+                .attr("text-anchor", "middle")
+                .text(d => {
+                    if (d.isRoot) return "Root";
+                    const parts = d.id.split('-');
+                    const nibble = parts[parts.length - 1];
+                    return parseInt(nibble).toString(16).toUpperCase();
+                })
+                .attr("fill", "#333")
+                .attr("font-size", 10);
+                
+            // Add position labels to nodes (depth > 0)
+            node.filter(d => !d.isRoot)
+                .append("text")
+                .attr("dy", 4)
+                .attr("text-anchor", "middle")
+                .text(d => {
+                    const parts = d.id.split('-');
+                    const depth = parts.length - 1;
+                    return `[${depth-1}]`;
+                })
+                .attr("fill", "#777")
+                .attr("font-size", 8);
+            
+            // Update positions on each tick
+            simulation.on("tick", () => {
+                // Adjust node positions by depth to create better layering
+                nodes.forEach(d => {
+                    // Get depth
+                    const depth = d.id.split('-').length - 1;
+                    // Apply force toward ideal y position
+                    const idealY = 50 + (depth * 80);
+                    d.y += (idealY - d.y) * 0.05;
+                    
+                    // Spread nodes at the same depth horizontally
+                    nodes.forEach(other => {
+                        if (d !== other && d.id.split('-').length === other.id.split('-').length) {
+                            const dx = d.x - other.x;
+                            const dy = d.y - other.y;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            if (distance < 70) {
+                                d.x += dx * 0.1;
+                                d.y += dy * 0.1;
+                            }
+                        }
+                    });
+                    
+                    // Keep nodes within bounds
+                    d.x = Math.max(20, Math.min(width - 20, d.x));
+                    d.y = Math.max(20, Math.min(height - 20, d.y));
+                });
+                
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                
+                g.selectAll(".link-label")
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+                
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+            
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+        
+        // Highlight a path in the tree
+        function highlightPath(path, key) {
+            // Reset all nodes and links
+            d3.selectAll("circle")
+                .style("stroke", "#fff")
+                .style("stroke-width", 1.5);
+                
+            d3.selectAll("line")
+                .style("stroke", "#999")
+                .style("stroke-width", 1);
+            
+            // Highlight the path
+            let currentNode = hashtable.root;
+            let currentNodeId = "root";
+            
+            // Highlight the root node
+            d3.select(`#node-${currentNodeId} circle`)
+                .style("stroke", "#ff0000")
+                .style("stroke-width", "3px");
+            
+            // Highlight each node in the path
+            for (let i = 0; i < path.length; i++) {
+                const nibble = path[i];
+                if (!currentNode[nibble]) break;
+                
+                const childNodeId = `${currentNodeId}-${nibble}`;
+                currentNode = currentNode[nibble];
+                
+                // Highlight the node
+                d3.select(`#node-${childNodeId} circle`)
+                    .style("stroke", "#ff0000")
+                    .style("stroke-width", "3px");
+                
+                // Highlight the link
+                d3.select(`#link-${currentNodeId}-${childNodeId}`)
+                    .style("stroke", "#ff0000")
+                    .style("stroke-width", "2px");
+                
+                currentNodeId = childNodeId;
+            }
+            
+            // Special highlight for the leaf node containing the full string
+            if (currentNode.value === key) {
+                // Make the leaf node more prominent
+                const leafNode = d3.select(`#node-${currentNodeId} circle`);
+                
+                if (!leafNode.empty()) {
+                    leafNode
+                        .style("stroke", "#ff0000")
+                        .style("stroke-width", "4px")
+                        .style("stroke-dasharray", "5,3");
+                    
+                    // Create a pulsing animation
+                    animatePulse(leafNode);
+                }
+            }
+        }
+        
+        // Animate a pulsing effect on a node
+        function animatePulse(selection) {
+            if (selection.empty()) return;
+            
+            const origRadius = parseFloat(selection.attr("r"));
+            if (isNaN(origRadius)) return;
+            
+            function pulse() {
+                selection
+                    .transition()
+                    .duration(600)
+                    .attr("r", origRadius * 1.3)
+                    .transition()
+                    .duration(600)
+                    .attr("r", origRadius)
+                    .on("end", pulse);
+            }
+            
+            pulse();
+        }
+        
+        // Get tooltip content for a node
+        function getNodeTooltip(d) {
+            if (d.isRoot) {
+                return "Root Node";
+            } else if (d.hasValue) {
+                const parts = d.id.split('-');
+                const lastNibble = parseInt(parts[parts.length - 1]).toString(16).toUpperCase();
+                return `Leaf Node<br>Value: "${d.value}"<br>Last Nibble: ${lastNibble}<br>Depth: ${parts.length - 1}`;
+            } else {
+                const parts = d.id.split('-');
+                const lastNibble = parseInt(parts[parts.length - 1]).toString(16).toUpperCase();
+                return `Path Node<br>Nibble: ${lastNibble}<br>Depth: ${parts.length - 1}`;
+            }
+        }
+        
+        // Convert hashtable to graph data
+        function convertToGraphData(root, maxDepth) {
+            const nodes = [];
+            const links = [];
+            const visited = new Set();
+            
+            // Add root node
+            nodes.push({
+                id: "root",
+                isRoot: true,
+                hasValue: !!root.value,
+                value: root.value,
+                depth: 0
+            });
+            
+            visited.add("root");
+            
+            // Recursively add nodes and links
+            function addNodesAndLinks(node, nodeId, depth) {
+                if (depth >= maxDepth) return;
+                
+                for (let i = 0; i < 16; i++) {
+                    if (node[i]) {
+                        const childId = nodeId + "-" + i;
+                        
+                        // Only add if not visited
+                        if (!visited.has(childId)) {
+                            nodes.push({
+                                id: childId,
+                                isRoot: false,
+                                hasValue: !!node[i].value,
+                                value: node[i].value,
+                                depth: depth + 1
+                            });
+                            
+                            visited.add(childId);
+                        }
+                        
+                        // Add link
+                        links.push({
+                            source: nodeId,
+                            target: childId,
+                            value: 1
+                        });
+                        
+                        // Recursively add children
+                        addNodesAndLinks(node[i], childId, depth + 1);
+                    }
+                }
+            }
+            
+            addNodesAndLinks(root, "root", 0);
+            
+            return { nodes, links };
+        }
+        
+        // Reset the hashtable
+        function resetHashtable() {
+            hashtable.root = {};
+            hashtable.storedKeys = {};
+            updateKeysList();
+            updateGraph();
+            status.style.display = "none";
+            hashDisplay.style.display = "none";
+        }
+        
+        // Simple reset view function
+        function resetView() {
+            svg.transition()
+                .duration(300)
+                .call(zoom.transform, d3.zoomIdentity);
+        }
+        
+        // Event handlers for zoom controls
+        zoomInBtn.addEventListener('click', () => {
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleBy, 1.5);
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            svg.transition()
+                .duration(300)
+                .call(zoom.scaleBy, 0.6);
+        });
+
+        resetViewBtn.addEventListener('click', resetView);
+        
+        // Apply depth button handler
+        document.getElementById('applyDepthBtn').addEventListener('click', () => {
+            updateGraph();
+        });
+        
+        // Initialize
+        function init() {
+            // Initial graph
+            updateGraph();
+            
+            // Initial keys list
+            updateKeysList();
+            
+            // Event listeners
+            insertBtn.addEventListener('click', () => {
+                const key = keyInput.value.trim();
+                if (key) {
+                    insertKey(key);
+                } else {
+                    showStatus('Please enter a key to insert');
+                }
+            });
+            
+            resetBtn.addEventListener('click', resetHashtable);
+            
+            keyInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const key = keyInput.value.trim();
+                    if (key) {
+                        insertKey(key);
+                    }
+                }
+            });
+            
+            maxDepthSelect.addEventListener('change', () => {
+                // Don't auto-update on change, wait for Apply button
+                // This prevents slowdowns from frequent updates
+            });
+        }
+        
+        // Start the visualization
+        init();
+    </script>
+</body>
+</html>
